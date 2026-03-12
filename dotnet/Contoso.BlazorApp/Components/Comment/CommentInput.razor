@@ -1,0 +1,61 @@
+@inject AuthService AuthService
+@inject IJSRuntime JS
+@using Contoso.BlazorApp.Models
+
+<div class="w-full mt-4 pt-4 border-t border-gray-300">
+    <form class="flex gap-2 items-start" @onsubmit="HandleSubmit">
+        <textarea class="flex-1 min-h-60 bg-gray-100 dark:bg-gray-800 rounded-md p-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-70"
+                  @bind="content"
+                  @bind:event="oninput"
+                  placeholder="Add a comment"
+                  disabled="@(isLoading || !isUserLoggedIn)"></textarea>
+        <button type="submit"
+                disabled="@(string.IsNullOrWhiteSpace(content) || isLoading || !isUserLoggedIn)"
+                class="bg-blue-600 text-white rounded-md px-4 py-2 text-sm h-10 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+            Post
+        </button>
+    </form>
+</div>
+
+@code {
+    [Parameter]
+    public int PostId { get; set; }
+
+    [Parameter]
+    public EventCallback<Comment> OnCommentAdded { get; set; }
+
+    private string content = "";
+    private bool isLoading = false;
+    private bool isUserLoggedIn => AuthService.CurrentUser != null;
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(content) || !isUserLoggedIn) return;
+
+        isLoading = true;
+
+        try
+        {
+            var user = AuthService.CurrentUser;
+            if (user?.Username == null) return;
+
+            var commentService = new CommentService(new ApiClientService(new HttpClient { BaseAddress = new Uri("http://localhost:8080/api/") }, JS));
+            var response = await commentService.CreateCommentAsync(PostId, content, user.Username);
+            
+            content = "";
+            if (OnCommentAdded.HasDelegate && response?.Data != null)
+            {
+                await OnCommentAdded.InvokeAsync(response.Data);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "An error occurred while adding the comment.");
+            Console.WriteLine($"Comment creation error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

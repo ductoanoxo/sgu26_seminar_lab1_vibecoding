@@ -1,0 +1,107 @@
+@inject PostService PostService
+@inject AuthService AuthService
+@inject IJSRuntime JS
+
+<Modal IsOpen="IsOpen" OnClose="HandleCancel">
+    <div class="w-full mb-4">
+        <textarea @bind="content"
+                  @bind:event="oninput"
+                  placeholder="Enter your content."
+                  disabled="@isLoading"
+                  autofocus
+                  class="w-full min-h-150 bg-gray-100 dark:bg-gray-800 rounded-md p-4 text-base text-gray-900 dark:text-white placeholder-gray-400 resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-70"></textarea>
+    </div>
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <p class="text-red-500 text-sm mb-4 text-center">@error</p>
+    }
+    <div class="flex justify-center gap-4">
+        <button @onclick="HandleSubmit"
+                disabled="@(isLoading || string.IsNullOrWhiteSpace(content))"
+                class="bg-blue-600 text-white rounded-md px-8 py-3 text-sm transition-opacity disabled:opacity-70 disabled:cursor-not-allowed">
+            @(isLoading ? "Processing..." : "Submit")
+        </button>
+        <button @onclick="HandleCancel"
+                disabled="@isLoading"
+                class="bg-gray-200 text-gray-800 rounded-md px-8 py-3 text-sm transition-opacity disabled:opacity-70 disabled:cursor-not-allowed">
+            Cancel
+        </button>
+    </div>
+</Modal>
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnPostCreated { get; set; }
+
+    private string content = "";
+    private bool isLoading = false;
+    private string error = "";
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            error = "Please enter content.";
+            return;
+        }
+
+        isLoading = true;
+        error = "";
+
+        try
+        {
+            var user = AuthService.CurrentUser;
+            if (user?.Username == null)
+            {
+                error = "You must be logged in to create a post.";
+                return;
+            }
+
+            var response = await PostService.CreatePostAsync(content, user.Username);
+            content = "";
+            await OnClose.InvokeAsync();
+            if (OnPostCreated.HasDelegate)
+            {
+                await OnPostCreated.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = "An error occurred while creating the post. Please try again.";
+            Console.WriteLine($"Post creation error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleCancel()
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved content. Are you sure you want to cancel?");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+        content = "";
+        await OnClose.InvokeAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!IsOpen)
+        {
+            content = "";
+            error = "";
+        }
+    }
+}

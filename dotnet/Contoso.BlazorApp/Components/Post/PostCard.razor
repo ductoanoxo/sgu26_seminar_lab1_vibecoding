@@ -1,0 +1,124 @@
+@inject NavigationManager Navigation
+@inject PostService PostService
+@inject AuthService AuthService
+@using Contoso.BlazorApp.Models
+
+<div class="flex flex-col w-full max-w-2xl bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 cursor-pointer"
+     @onclick="HandlePostClick">
+    <div class="flex items-center mb-2">
+        <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 mr-2"></div>
+        <div class="text-base font-bold text-gray-900 dark:text-white">
+            @Post?.Username
+        </div>
+    </div>
+    <div class="mb-2">
+        <p class="text-base text-gray-900 dark:text-white leading-relaxed break-words">
+            @Post?.Content
+        </p>
+    </div>
+    <div class="flex gap-6 mt-2">
+        <button @onclick="HandleLikeToggle"
+                @onclick:stopPropagation="true"
+                class="@GetLikeButtonClass()"
+                aria-label="Like">
+            @if (isLiked)
+            {
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/>
+                </svg>
+            }
+            else
+            {
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            }
+            @if (likesCount > 0)
+            {
+                <span class="text-xs">@likesCount</span>
+            }
+        </button>
+        <button @onclick="HandleCommentClick"
+                @onclick:stopPropagation="true"
+                class="flex items-center gap-1 text-gray-500 hover:text-blue-500"
+                aria-label="Comment">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z" fill="currentColor"/>
+            </svg>
+            @if (Post?.CommentCount > 0)
+            {
+                <span class="text-xs">@Post.CommentCount</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Post? Post { get; set; }
+
+    private bool isLiked;
+    private int likesCount;
+
+    protected override void OnParametersSet()
+    {
+        if (Post != null)
+        {
+            isLiked = Post.Liked ?? false;
+            likesCount = Post.LikeCount ?? 0;
+        }
+    }
+
+    private void HandlePostClick()
+    {
+        if (Post?.PostId != null)
+        {
+            Navigation.NavigateTo($"/post/{Post.PostId}");
+        }
+    }
+
+    private async Task HandleLikeToggle()
+    {
+        try
+        {
+            var user = AuthService.CurrentUser;
+            if (user == null || Post?.PostId == null) return;
+
+            if (isLiked)
+            {
+                var response = await PostService.UnlikePostAsync(Post.PostId.Value);
+                if (response?.Data?.LikeCount != null)
+                {
+                    likesCount = response.Data.LikeCount.Value;
+                    isLiked = false;
+                }
+            }
+            else
+            {
+                var response = await PostService.LikePostAsync(Post.PostId.Value, user.Username!);
+                if (response?.Data?.LikeCount != null)
+                {
+                    likesCount = response.Data.LikeCount.Value;
+                    isLiked = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error occurred while processing like: {ex.Message}");
+        }
+    }
+
+    private void HandleCommentClick()
+    {
+        if (Post?.PostId != null)
+        {
+            Navigation.NavigateTo($"/post/{Post.PostId}");
+        }
+    }
+
+    private string GetLikeButtonClass()
+    {
+        return $"flex items-center gap-1 {(isLiked ? "text-red-500" : "text-gray-500 hover:text-red-500")}";
+    }
+}

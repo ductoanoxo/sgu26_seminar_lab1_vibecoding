@@ -1,0 +1,22 @@
+@inject NavigationManager Navigation
+
+<a href="@Href" class="@CssClass" aria-current="@(Active ? "page" : null)" aria-label="@AriaLabel">
+    @ChildContent
+</a>
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = "/";
+
+    [Parameter]
+    public bool Active { get; set; }
+
+    [Parameter]
+    public string AriaLabel { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string CssClass =>
+        $"flex items-center justify-center w-10 h-10 rounded-full transition-colors {(Active ? "bg-blue-100 text-blue-600" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800")}";
+}
